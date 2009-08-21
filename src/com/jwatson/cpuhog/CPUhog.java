@@ -90,7 +90,6 @@ public class CPUhog {
                 "\t<n threads>\t 100\tNumber of CPU-loading threads to start (there will usually be 2 additional 'system' ones)\n" +
                 "\t<matrix sz>\t 100\tSize of matrices to use - so you can hog memory too!\n" +
                 "\t<log delay>\t1000\tNumber of ms to wait between log output lines (won't be exact)\n\n");
-
     }
 
     private static void dumpSystemInformation() {
