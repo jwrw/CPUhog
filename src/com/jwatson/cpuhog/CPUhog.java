@@ -4,7 +4,16 @@
  */
 package com.jwatson.cpuhog;
 
-import com.jwatson.fastmatrix.Matrix;
+import java.lang.management.CompilationMXBean;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.MemoryManagerMXBean;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.OperatingSystemMXBean;
+import java.lang.management.RuntimeMXBean;
+import java.lang.management.ThreadMXBean;
+import java.util.List;
+import java.util.TreeMap;
 
 /**
  * The main class of the CPUhog application.
@@ -20,7 +29,7 @@ public class CPUhog {
     final static int NTHREADS = 100;
     final static long MONITORWAIT_MS = 1000;
     final static int ITERSPERTITLE = 20;
-
+    final static String NOT_SUPPORTED = "<not supported>";
     static int nThreads;
     static int mSize;
     static long monitorWait_ms;
@@ -46,22 +55,24 @@ public class CPUhog {
             monitorWait_ms = Long.parseLong(args[2]);
         }
         
-        if (args.length >3) throw new Exception();
+            if (args.length > 3) {
+                throw new Exception();
+            }
 
         } catch (Exception e) {
             usage();
             System.exit(-1);
         }
 
-
+        dumpSystemInformation();
 
         System.out.println("Hogging all the CPU with " + nThreads + " java threads\n" +
                 "doing " + mSize + "x" + mSize + " matrix arithmetic.");
 
-        (new MonitorThread()).start();
+        (new Thread(new MonitorThread())).start();
 
         for (int i = 0; i < nThreads; i++) {
-            Thread t = new ThrashThread();
+            Thread t = new Thread(new ThrashThread());
             t.setPriority(t.getPriority()-1);   // minimise system killing ability?
             t.setDaemon(true);                  // faster exit?
             t.start();
@@ -82,64 +93,66 @@ public class CPUhog {
 
     }
 
-    static class MonitorThread extends Thread {
+    private static void dumpSystemInformation() {
+        CompilationMXBean compilationMXBean = ManagementFactory.getCompilationMXBean();
+        OperatingSystemMXBean operatingSystemMXBean = ManagementFactory.getOperatingSystemMXBean();
+        RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
+        ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
+        List<MemoryManagerMXBean> memoryManagerMXBeans = ManagementFactory.getMemoryManagerMXBeans();
+        List<MemoryPoolMXBean> memoryPoolMXBeans = ManagementFactory.getMemoryPoolMXBeans();
 
-        @Override
-        public void run() {
+        System.out.println("Compliation Information");
+        System.out.println("JIT compiler name: " + compilationMXBean.getName());
+        System.out.println("Total JIT compile time: " +
+                (compilationMXBean.isCompilationTimeMonitoringSupported() ? compilationMXBean.getTotalCompilationTime() : NOT_SUPPORTED));
             System.out.println();
-            Runtime rt = Runtime.getRuntime();
-            ThreadGroup tg = Thread.currentThread().getThreadGroup();
-            long t0 = System.nanoTime();
 
-            Object obj = new Object();
-            while (true) {
-                System.out.println("Time /s Threads CPUs   Free mem  Total mem   Max mem");
+        System.out.println("Operating System Information");
+        System.out.println("OS name: " + operatingSystemMXBean.getName());
+        System.out.println("OS version: " + operatingSystemMXBean.getVersion());
+        System.out.println("Architecture: " + operatingSystemMXBean.getArch());
+        System.out.println("Available processors: " + operatingSystemMXBean.getAvailableProcessors());
+        System.out.println();
 
-                for (int i = 0; i < ITERSPERTITLE; i++) {
-                    System.out.println(
-                            String.format("%7.3f %7d %4d %10d %10d %10d",
-                            (System.nanoTime()-t0)/1e9,
-                            tg.activeCount(),
-                            rt.availableProcessors(),
-                            rt.freeMemory(),
-                            rt.totalMemory(),
-                            rt.maxMemory()));
-
-                    synchronized (obj) {
-                        try {
-                            obj.wait(monitorWait_ms);
-                        } catch (InterruptedException ex) {
+        System.out.println("Runtime Information");
+        System.out.println("---system properties---");
+        TreeMap<String, String> sortedProps = new TreeMap<String, String>(runtimeMXBean.getSystemProperties());
+        for (String key : sortedProps.keySet()) {
+            System.out.println(">" + key + ": " + sortedProps.get(key));
                         }
+        System.out.println("---end of system properties---");
+        System.out.println("JVM uptime/ms: " + runtimeMXBean.getUptime());
+        System.out.println();
+
+        System.out.println("Thread Information");
+        System.out.println("Thread count: " + threadMXBean.getThreadCount());
+        System.out.println("Thread CPU time supported: " + threadMXBean.isThreadCpuTimeSupported());
+        System.out.println("Thread CPU time enabled: " + threadMXBean.isThreadCpuTimeEnabled());
+        System.out.println();
+
+        System.out.println("Memory Information");
+        System.out.println("Heap memory usage: " + memoryMXBean.getHeapMemoryUsage());
+        System.out.println("Non-heap memory usage: " + memoryMXBean.getNonHeapMemoryUsage());
+        System.out.println();
+
+        for (MemoryManagerMXBean mmmxb : memoryManagerMXBeans) {
+            System.out.println("Memory Manager Information (Name: " + mmmxb.getName() + ")");
+            System.out.print("Managed pool names: ");
+            for (String poolName : mmmxb.getMemoryPoolNames()) {
+                System.out.print("'" + poolName + "' ");
+                    }
+            System.out.println();
+            System.out.println();
+        }
+
+        for (MemoryPoolMXBean mpmxb : memoryPoolMXBeans) {
+            System.out.println("Memory Pool Information (Name: " + mpmxb.getName() + ")");
+            System.out.println("Peak usage: " + mpmxb.getPeakUsage());
+            System.out.println("Type: " + mpmxb.getType());
+            System.out.println("Usage: " + mpmxb.getUsage());
+            System.out.println("Usage threshold: " + (mpmxb.isUsageThresholdSupported() ? mpmxb.getUsageThreshold() : NOT_SUPPORTED));
+            System.out.println();
                     }
                 }
             }
-        }
-    }
-
-    static class ThrashThread extends Thread {
-
-        @Override
-        public void run() {
-            while (true) {
-                double aData[][] = new double[mSize][mSize];
-                double bData[][] = new double[mSize][mSize];
-
-                for (int r = 0; r < mSize; r++) {
-                    for (int c = 0; c < mSize; c++) {
-                        aData[r][c] = Math.random();
-                        bData[r][c] = Math.random();
-                    }
-
-                    Matrix a = new Matrix(aData);
-                    Matrix b = new Matrix(bData);
-
-                    for (int i = 0; i < NLOOPS; i++) {
-                        Matrix c = a.postMultiply(b);
-                        a = b;
-                        b = c;
-                    }
-                }
-            }
-        }
-    }
-}
