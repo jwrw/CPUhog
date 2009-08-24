@@ -199,13 +199,49 @@ public class CPUhog {
 
     private static void usage() {
         System.err.println(
-                "\nUsage: java -jar CPUhog.jar <n threads> <matrix sz> <log delay>\n" +
+                " Usage:\n" +
+                " java -jar CPUhog <options>\n" +
                 "\n" +
-                "\tArguments are optional, but the preceeding ones must be entered\n" +
-                "\t<n threads>\t 100\tNumber of CPU-loading threads to start (there will usually be 2 additional 'system' ones)\n" +
-                "\t<matrix sz>\t 100\tSize of matrices to use - so you can hog memory too!\n" +
-                "\t<log delay>\t1000\tNumber of ms to wait between log output lines (won't be exact)\n\n");
+                " The options can be specified in any order and later ones override earlier ones.\n" +
+                " Available options are\n" +
+                " -t nnn   Start load nnn threads (default 10).  Typically the main program\n" +
+                "          runs in the initial thread and it starts a monitoring thread as\n" +
+                "          well as the specified number of load threads.  You may see additional\n" +
+                "          threads created by the JVM for system use.\n" +
+                "\n" +
+                " -d nnn   The dimension of the square matrices used in the load thread (default 10).\n" +
+                "          Larger values here result in a larger memory footprint.  Too large\n" +
+                "          and your application will start to get out of memory errors.  When\n" +
+                "          this starts happening, the CPU load cannot usually be maintained.\n" +
+                "\n" +
+                " -da      Permit the application to adjust the array dimension.  Initially this\n" +
+                "          will reduce the matrix dimensions when out of memory errors start to\n" +
+                "          occur.  During adjustment the load may fluctuate.  Currently the\n" +
+                "          size is not adjusted upwards so the -d option can be used to set an\n" +
+                "          upper value.\n" +
+                "\n" +
+                " -w nnn   The amount of time (ms) to wait between log line outputs.\n" +
+                "\n" +
+                " -sn      No statistics.\n" +
+                " -sa      All statistics\n" +
+                " -sc      Compilation information\n" +
+                " -so      Operating system information.  This is the only section output by default.\n" +
+                " -sr      Runtime information (includes all java system properties)\n" +
+                " -st      Thread information\n" +
+                " -sm      Memory information\n" +
+                " -sp      Memory pool information\n" +
+                "\n" +
+                " -c nnn   The target percentage of total CPU to use (integer - default 100).\n" +
+                "          A delay within each load thread will be adjusted to bring the aggregate\n" +
+                "          load on the system to the specified percentage. The granularity that\n" +
+                "          the application can achieve will be determined by the size of matrix\n" +
+                "          and the speed of CPU.  This also relies on the JVM / OS to spread the\n" +
+                "          total load evenly (although this may be what you are testing!)\n" +
+                "\n" +
+                " -q       Supress logging information.\n" +
+                "\n");
     }
+ 
 
     private static void dumpSystemInformation() {
         CompilationMXBean compilationMXBean = ManagementFactory.getCompilationMXBean();
