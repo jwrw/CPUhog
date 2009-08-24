@@ -1,6 +1,68 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * CPUhog.java
+ *
+ * The CPUhog provides a simple way to load a multipocessor / multithread machine
+ * to the speified degree.
+ *
+ * The aplication is written in Java so runs unmodified on a variety of platforms.
+ *
+ * It is self-contained and requires no additional special libraries.
+ *
+ * The system load is created using a number of Java threads. To fully load any
+ * environment the application requires that the Java Virtual Machine (JVM)
+ * used to run the application spreads the load across the available system
+ * processors / cores / CPU threads.
+ *
+ * The load uses a mixture of integrer and double floating point arithmetic
+ * which provides a good load on many platforms.  However some CPU architectures
+ * with restricted availabilty of floating point hardware will find their integer
+ * components not fully utilised.  (A future version may do something about this).
+ *
+ * The application can alos print out a great deal of diagnosic information
+ * about the system, the JVM and the environment. This information is largely
+ * derived from the java.lang.management 'MXBean' family of components.  A more
+ * comprehensive description of the statistics generated may be found there.
+ *
+ * Usage:
+ * java -jar CPUhog <options>
+ *
+ * The options can be specified in any order and later ones override earlier ones.
+ * Available options are
+ * -t nnn   Start load nnn threads (default 10).  Typically the main program
+ *          runs in the initial thread and it starts a monitoring thread as
+ *          well as the specified number of load threads.  You may see additional
+ *          threads created by the JVM for system use.
+ *
+ * -d nnn   The dimension of the square matrices used in the load thread (default 10).
+ *          Larger values here result in a larger memory footprint.  Too large
+ *          and your application will start to get out of memory errors.  When
+ *          this starts happening, the CPU load cannot usually be maintained.
+ * -da      Permit the application to adjust the array dimension.  Initially this
+ *          will reduce the matrix dimensions when out of memory errors start to
+ *          occur.  During adjustment the load may fluctuate.  Currently the
+ *          size is not adjusted upwards so the -d option can be used to set an
+ *          upper value.
+ *
+ * -w nnn   The amount of time (ms) to wait between log line outputs.
+ *
+ * -sn      No statistics.
+ * -sa      All statistics
+ * -sc      Compilation information
+ * -so      Operating system information.  This is the only section output by default.
+ * -sr      Runtime information (includes all java system properties)
+ * -st      Thread information
+ * -sm      Memory information
+ * -sp      Memory pool information
+ *
+ * -c nnn   The target percentage of total CPU to use (integer - default 100).
+ *          A delay within each load thread will be adjusted to bring the aggregate
+ *          load on the system to the specified percentage. The granularity that
+ *          the application can achieve will be determined by the size of matrix
+ *          and the speed of CPU.  This also relies on the JVM / OS to spread the
+ *          total load evenly (although this may be what you are testing!)
+ *
+ * -q       Supress logging information.
+ *
  */
 package com.jwatson.cpuhog;
 
@@ -12,6 +74,7 @@ import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -24,39 +87,88 @@ import java.util.TreeMap;
  */
 public class CPUhog {
 
-    final static int MSIZE = 100;
-    final static int NLOOPS = 100;
-    final static int NTHREADS = 100;
-    final static long MONITORWAIT_MS = 1000;
+    final static int NLOOPS = 25;
     final static int ITERSPERTITLE = 20;
     final static String NOT_SUPPORTED = "<not supported>";
-    static int nThreads;
-    static int mSize;
-    static long monitorWait_ms;
+    public static int nThreads = 10;
+    public static int mSize = 10;
+    public static long monitorWait_ms = 2000;
+    public static boolean autoDimensioningAllowed = false;
+    public static boolean showCompilationStats = false;
+    public static boolean showOSStats = true;
+    public static boolean showRuntimeStats = false;
+    public static boolean showThreadStats = false;
+    public static boolean showMemoryStats = false;
+    public static boolean showPoolStats = false;
+    public static boolean generateLogging = true;
+    public static int targetCPUpercent = 100;
+    public static ArrayList<ThrashThread> loadThreads;
+    public static Thread monitorThread;
 
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        nThreads = NTHREADS;
-        mSize = MSIZE;
-        monitorWait_ms = MONITORWAIT_MS;
-
         try {
-        if (args.length > 0) {
-            nThreads = Integer.parseInt(args[0]);
-        }
-        
-        if (args.length > 1) {
-            mSize = Integer.parseInt(args[1]);
-        }
-        
-        if (args.length >2) {
-            monitorWait_ms = Long.parseLong(args[2]);
-        }
-        
-            if (args.length > 3) {
-                throw new Exception();
+            for (int i = 0; i < args.length; i++) {
+
+                if (args[i].equals("-t")) {
+                    i++;
+                    nThreads = Integer.parseInt(args[i]);
+                    if (nThreads < 1) {
+                        throw new IllegalArgumentException("must have number of threads >= 1");
+                    }
+                } else if (args[i].equals("-d")) {
+                    i++;
+                    mSize = Integer.parseInt(args[i]);
+                    if (mSize < 1) {
+                        throw new IllegalArgumentException("must have matrix dimensions >= 1");
+                    }
+                } else if (args[i].equals("-da")) {
+                    autoDimensioningAllowed = true;
+                } else if (args[i].equals("-w")) {
+                    i++;
+                    monitorWait_ms = Long.parseLong(args[i]);
+                    if (mSize < 1) {
+                        throw new IllegalArgumentException("must have wait >= 0 ms");
+                    }
+                } else if (args[i].equals("-sn")) {
+                    showCompilationStats = false;
+                    showOSStats = false;
+                    showRuntimeStats = false;
+                    showThreadStats = false;
+                    showMemoryStats = false;
+                    showPoolStats = false;
+                } else if (args[i].equals("-sa")) {
+                    showCompilationStats = true;
+                    showOSStats = true;
+                    showRuntimeStats = true;
+                    showThreadStats = true;
+                    showMemoryStats = true;
+                    showPoolStats = true;
+                } else if (args[i].equals("-sc")) {
+                    showCompilationStats = true;
+                } else if (args[i].equals("-so")) {
+                    showOSStats = true;
+                } else if (args[i].equals("-sr")) {
+                    showRuntimeStats = true;
+                } else if (args[i].equals("-st")) {
+                    showThreadStats = true;
+                } else if (args[i].equals("-sm")) {
+                    showMemoryStats = true;
+                } else if (args[i].equals("-sp")) {
+                    showPoolStats = true;
+                } else if (args[i].equals("-c")) {
+                    i++;
+                    targetCPUpercent = Integer.parseInt(args[i]);
+                    if (targetCPUpercent > 100 || targetCPUpercent < 0) {
+                        throw new IllegalArgumentException("must have 0 <= CPU <= 100");
+                    }
+                } else if (args[i].equals("-q")) {
+                    generateLogging = false;
+                } else {
+                    throw new IllegalArgumentException("Bad command line arguments");
+                }
             }
 
         } catch (Exception e) {
@@ -69,11 +181,14 @@ public class CPUhog {
         System.out.println("Hogging all the CPU with " + nThreads + " java threads\n" +
                 "doing " + mSize + "x" + mSize + " matrix arithmetic.");
 
-        (new Thread(new MonitorThread())).start();
+        monitorThread = new Thread(new MonitorThread());
+        monitorThread.start();
 
+        loadThreads = new ArrayList<ThrashThread>(nThreads);
         for (int i = 0; i < nThreads; i++) {
-            Thread t = new Thread(new ThrashThread());
-            t.setPriority(t.getPriority()-1);   // minimise system killing ability?
+            ThrashThread t = new ThrashThread();
+            loadThreads.add(t);
+            t.setPriority(t.getPriority() - 1);   // minimise system killing ability?
             t.setDaemon(true);                  // faster exit?
             t.start();
         }
@@ -101,57 +216,72 @@ public class CPUhog {
         List<MemoryManagerMXBean> memoryManagerMXBeans = ManagementFactory.getMemoryManagerMXBeans();
         List<MemoryPoolMXBean> memoryPoolMXBeans = ManagementFactory.getMemoryPoolMXBeans();
 
-        System.out.println("Compliation Information");
-        System.out.println("JIT compiler name: " + compilationMXBean.getName());
-        System.out.println("Total JIT compile time: " +
-                (compilationMXBean.isCompilationTimeMonitoringSupported() ? compilationMXBean.getTotalCompilationTime() : NOT_SUPPORTED));
-            System.out.println();
+        if (showCompilationStats) {
+            System.out.println("Compliation Information");
 
-        System.out.println("Operating System Information");
-        System.out.println("OS name: " + operatingSystemMXBean.getName());
-        System.out.println("OS version: " + operatingSystemMXBean.getVersion());
-        System.out.println("Architecture: " + operatingSystemMXBean.getArch());
-        System.out.println("Available processors: " + operatingSystemMXBean.getAvailableProcessors());
-        System.out.println();
-
-        System.out.println("Runtime Information");
-        System.out.println("---system properties---");
-        TreeMap<String, String> sortedProps = new TreeMap<String, String>(runtimeMXBean.getSystemProperties());
-        for (String key : sortedProps.keySet()) {
-            System.out.println(">" + key + ": " + sortedProps.get(key));
-                        }
-        System.out.println("---end of system properties---");
-        System.out.println("JVM uptime/ms: " + runtimeMXBean.getUptime());
-        System.out.println();
-
-        System.out.println("Thread Information");
-        System.out.println("Thread count: " + threadMXBean.getThreadCount());
-        System.out.println("Thread CPU time supported: " + threadMXBean.isThreadCpuTimeSupported());
-        System.out.println("Thread CPU time enabled: " + threadMXBean.isThreadCpuTimeEnabled());
-        System.out.println();
-
-        System.out.println("Memory Information");
-        System.out.println("Heap memory usage: " + memoryMXBean.getHeapMemoryUsage());
-        System.out.println("Non-heap memory usage: " + memoryMXBean.getNonHeapMemoryUsage());
-        System.out.println();
-
-        for (MemoryManagerMXBean mmmxb : memoryManagerMXBeans) {
-            System.out.println("Memory Manager Information (Name: " + mmmxb.getName() + ")");
-            System.out.print("Managed pool names: ");
-            for (String poolName : mmmxb.getMemoryPoolNames()) {
-                System.out.print("'" + poolName + "' ");
-                    }
-            System.out.println();
+            System.out.println("JIT compiler name: " + compilationMXBean.getName());
+            System.out.println("Total JIT compile time: " +
+                    (compilationMXBean.isCompilationTimeMonitoringSupported() ? compilationMXBean.getTotalCompilationTime() : NOT_SUPPORTED));
             System.out.println();
         }
 
-        for (MemoryPoolMXBean mpmxb : memoryPoolMXBeans) {
-            System.out.println("Memory Pool Information (Name: " + mpmxb.getName() + ")");
-            System.out.println("Peak usage: " + mpmxb.getPeakUsage());
-            System.out.println("Type: " + mpmxb.getType());
-            System.out.println("Usage: " + mpmxb.getUsage());
-            System.out.println("Usage threshold: " + (mpmxb.isUsageThresholdSupported() ? mpmxb.getUsageThreshold() : NOT_SUPPORTED));
+        if (showOSStats) {
+            System.out.println("Operating System Information");
+            System.out.println("OS name: " + operatingSystemMXBean.getName());
+            System.out.println("OS version: " + operatingSystemMXBean.getVersion());
+            System.out.println("Architecture: " + operatingSystemMXBean.getArch());
+            System.out.println("Available processors: " + operatingSystemMXBean.getAvailableProcessors());
             System.out.println();
-                    }
-                }
+        }
+
+        if (showRuntimeStats) {
+            System.out.println("Runtime Information");
+            System.out.println("---system properties---");
+            TreeMap<String, String> sortedProps = new TreeMap<String, String>(runtimeMXBean.getSystemProperties());
+            for (String key : sortedProps.keySet()) {
+                System.out.println(">" + key + ": " + sortedProps.get(key));
             }
+
+            System.out.println("---end of system properties---");
+            System.out.println("JVM uptime/ms: " + runtimeMXBean.getUptime());
+            System.out.println();
+        }
+
+        if (showThreadStats) {
+            System.out.println("Thread Information");
+            System.out.println("Thread count: " + threadMXBean.getThreadCount());
+            System.out.println("Thread CPU time supported: " + threadMXBean.isThreadCpuTimeSupported());
+            System.out.println("Thread CPU time enabled: " + threadMXBean.isThreadCpuTimeEnabled());
+            System.out.println();
+        }
+
+        if (showMemoryStats) {
+            System.out.println("Memory Information");
+            System.out.println("Heap memory usage: " + memoryMXBean.getHeapMemoryUsage());
+            System.out.println("Non-heap memory usage: " + memoryMXBean.getNonHeapMemoryUsage());
+            System.out.println();
+
+            for (MemoryManagerMXBean mmmxb : memoryManagerMXBeans) {
+                System.out.println("Memory Manager Information (Name: " + mmmxb.getName() + ")");
+                System.out.print("Managed pool names: ");
+                for (String poolName : mmmxb.getMemoryPoolNames()) {
+                    System.out.print("'" + poolName + "' ");
+                }
+
+                System.out.println();
+                System.out.println();
+            }
+        }
+
+        if (showPoolStats) {
+            for (MemoryPoolMXBean mpmxb : memoryPoolMXBeans) {
+                System.out.println("Memory Pool Information (Name: " + mpmxb.getName() + ")");
+                System.out.println("Peak usage: " + mpmxb.getPeakUsage());
+                System.out.println("Type: " + mpmxb.getType());
+                System.out.println("Usage: " + mpmxb.getUsage());
+                System.out.println("Usage threshold: " + (mpmxb.isUsageThresholdSupported() ? mpmxb.getUsageThreshold() : NOT_SUPPORTED));
+                System.out.println();
+            }
+        }
+    }
+}
