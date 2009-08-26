@@ -26,6 +26,9 @@ class MonitorThread implements Runnable {
                 System.out.println("Time /s Threads CPUs   Free KBs  Total KBs    Max KBs  %CPU User %CPU Total %CPU / CPU LoopTime/s Ld Wait/ms mSize");
             }
             for (int i = 0; i < CPUhog.ITERSPERTITLE; i++) {
+                // Get the threads in the current thread group into an array
+                // May take a few goes to get a big enough array if
+                // the number is very rapidly increasing
                 Thread[] threads;
                 int nThreads;
                 do {
@@ -34,6 +37,8 @@ class MonitorThread implements Runnable {
                 } while (nThreads > threads.length);
 
 
+                // interrogate all the threads in the thread group to
+                // determine the total amount of CPU time they have all used
                 long newTotalUserTime = 0;
                 long newTotalCPUTime = 0;
                 long newSysTime = System.nanoTime();
@@ -44,6 +49,9 @@ class MonitorThread implements Runnable {
                 }
                 newSysTime = (newSysTime + System.nanoTime()) / 2;
 
+                // interrogate only the load threads to
+                // get an average time to perform the load within
+                // the main thread loop
                 long sumLoopTime = 0;
                 int nLoadThreads = 0;
                 for (ThrashThread t : CPUhog.loadThreads) {
@@ -56,27 +64,38 @@ class MonitorThread implements Runnable {
                     sumLoopTime = -1;
                     nLoadThreads = 1;
                 }
-
+                // Matrix size may be adjusted if the load is running too
+                // fast or too slow.
+                // The target is to have the load run twice within the logging time
+                // i.e. 2 * (load + load_wait) = logging_time
+                // so target is: 2 * load = logging_time * targetCPUpercent/100
+                // In practice the size is adjusted to bring the number of iterations
+                // achieved between ..._LO and ..._HI limits
                 double timeDelta_ns = newSysTime - sysTime;
                 double percentUserTime = 100. * (newTotalUserTime - totalUserTime) / timeDelta_ns;
                 double percentCPUTime = 100. * (newTotalCPUTime - totalCPUTime) / timeDelta_ns;
                 double perProcessorPercentCPU = percentCPUTime / rt.availableProcessors();
                 double aveLoadLoopTime_ns = sumLoopTime / nLoadThreads;
 
+                if (CPUhog.autoDimensioningAllowed) {
+                    double runTimesPerLog =
+                            CPUhog.monitorWait_ms * 1000000. * CPUhog.targetCPUpercent / 100. /
+                            aveLoadLoopTime_ns;
+                    if (runTimesPerLog<CPUhog.LOADRUNSPERLOG_LO) {
+                            CPUhog.mSize--;
+                    } else if (runTimesPerLog>CPUhog.LOADRUNSPERLOG_HI) {
+                             CPUhog.mSize++;
+                    }
+                }
+
+
+                // Adjust the wait time used in the load threads to give
+                // the target CPU load
                 if (CPUhog.targetCPUpercent < 100) {
                     double newLoadWaitTime_ns = aveLoadLoopTime_ns * (100. - CPUhog.targetCPUpercent) / CPUhog.targetCPUpercent;
                     CPUhog.loadWait_ms =
                             (int) (CPUhog.loadWait_ms * (1 - CPUhog.LOADWAITDAMPING) +
                             newLoadWaitTime_ns * CPUhog.LOADWAITDAMPING / 1000000.);
-                    if (CPUhog.autoDimensioningAllowed) {
-                        if (newLoadWaitTime_ns < 10000000.) {
-                            CPUhog.mSize++;
-                        } else if (newLoadWaitTime_ns > 16000000000L || newLoadWaitTime_ns / 1000000L > CPUhog.monitorWait_ms) {
-                            if (CPUhog.mSize > 1) {
-                                CPUhog.mSize--;
-                            }
-                        }
-                    }
                 }
 
                 if (CPUhog.generateLogging) {

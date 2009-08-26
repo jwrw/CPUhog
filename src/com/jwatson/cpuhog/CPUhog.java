@@ -91,7 +91,8 @@ public class CPUhog {
     public final static int ITERSPERTITLE = 20;
     public final static String NOT_SUPPORTED = "<not supported>";
     public final static double LOADWAITDAMPING = 0.3;
-
+    public final static double LOADRUNSPERLOG_LO = 1.;
+    public final static double LOADRUNSPERLOG_HI = 5.;
     public static int nThreads = 10;
     public static int mSize = 10;
     public static long monitorWait_ms = 2000;
@@ -108,13 +109,13 @@ public class CPUhog {
     public static Thread monitorThread;
 
     /** The wait time in the load loop cannot be set by the user but
-     * is adjusted by the application to fix the laod at the requested 
+     * is adjusted by the application to fix the load at the requested
      * percentage.  All load threads use the same wait time.
      */
     public static int loadWait_ms = 0;
 
-
     /**
+     * Main entry point for the application
      * @param args the command line arguments
      */
     public static void main(String[] args) {
@@ -191,9 +192,11 @@ public class CPUhog {
                 "doing " + mSize + "x" + mSize + " matrix arithmetic.");
 
         monitorThread = new Thread(new MonitorThread());
+        loadThreads = new ArrayList<ThrashThread>(nThreads);
+
         monitorThread.start();
 
-        loadThreads = new ArrayList<ThrashThread>(nThreads);
+
         for (int i = 0; i < nThreads; i++) {
             ThrashThread t = new ThrashThread();
             loadThreads.add(t);
@@ -250,7 +253,6 @@ public class CPUhog {
                 " -q       Supress logging information.\n" +
                 "\n");
     }
- 
 
     private static void dumpSystemInformation() {
         CompilationMXBean compilationMXBean = ManagementFactory.getCompilationMXBean();
