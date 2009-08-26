@@ -87,9 +87,11 @@ import java.util.TreeMap;
  */
 public class CPUhog {
 
-    final static int NLOOPS = 25;
-    final static int ITERSPERTITLE = 20;
-    final static String NOT_SUPPORTED = "<not supported>";
+    public final static int NLOOPS = 25;
+    public final static int ITERSPERTITLE = 20;
+    public final static String NOT_SUPPORTED = "<not supported>";
+    public final static double LOADWAITDAMPING = 0.3;
+
     public static int nThreads = 10;
     public static int mSize = 10;
     public static long monitorWait_ms = 2000;
@@ -104,6 +106,13 @@ public class CPUhog {
     public static int targetCPUpercent = 100;
     public static ArrayList<ThrashThread> loadThreads;
     public static Thread monitorThread;
+
+    /** The wait time in the load loop cannot be set by the user but
+     * is adjusted by the application to fix the laod at the requested 
+     * percentage.  All load threads use the same wait time.
+     */
+    public static int loadWait_ms = 0;
+
 
     /**
      * @param args the command line arguments

@@ -26,22 +26,30 @@ final public class ThrashThread extends Thread {
             double[][] b = new double[CPUhog.mSize][CPUhog.mSize];
             double[][] result = new double[CPUhog.mSize][CPUhog.mSize];
 
-
-            for (int r = 0; r < CPUhog.mSize; r++) {
-                for (int c = 0; c < CPUhog.mSize; c++) {
-                    a[r][c] = Math.random();
-                    b[r][c] = Math.random();
-                }
-            }
-
-            for (int i = 0; i < CPUhog.NLOOPS; i++) {
+            do {
                 long t0 = System.nanoTime();
-                matrixMultiply(result, a, b);
-                matrixCopy(a, result);
-                loopTime_ns = System.nanoTime() - t0;
-            }
+                for (int r = 0; r < a.length; r++) {
+                    for (int c = 0; c < a[0].length; c++) {
+                        a[r][c] = Math.random();
+                        b[r][c] = Math.random();
+                    }
+                }
 
+                for (int i = 0; i < CPUhog.NLOOPS; i++) {
+                    matrixMultiply(result, a, b);
+                    matrixCopy(a, result);
+                }
+                loopTime_ns = (System.nanoTime() - t0);
 
+                if (CPUhog.loadWait_ms > 0) {
+                    synchronized (this) {
+                        try {
+                            this.wait(CPUhog.loadWait_ms);
+                        } catch (InterruptedException ex) {
+                        }
+                    }
+                }
+            } while (a.length == CPUhog.mSize);
         }
     }
 
