@@ -13,12 +13,12 @@
  * used to run the application spreads the load across the available system
  * processors / cores / CPU threads.
  *
- * The load uses a mixture of integrer and double floating point arithmetic
+ * The load uses a mixture of integer and double floating point arithmetic
  * which provides a good load on many platforms.  However some CPU architectures
- * with restricted availabilty of floating point hardware will find their integer
+ * with restricted availabilty of floating point hardware may find their integer
  * components not fully utilised.  (A future version may do something about this).
  *
- * The application can alos print out a great deal of diagnosic information
+ * The application can also print out a great deal of diagnosic information
  * about the system, the JVM and the environment. This information is largely
  * derived from the java.lang.management 'MXBean' family of components.  A more
  * comprehensive description of the statistics generated may be found there.
@@ -76,6 +76,8 @@ import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.TreeMap;
 
 /**
@@ -107,7 +109,6 @@ public class CPUhog {
     public static int targetCPUpercent = 100;
     public static ArrayList<ThrashThread> loadThreads;
     public static Thread monitorThread;
-
     /** The wait time in the load loop cannot be set by the user but
      * is adjusted by the application to fix the load at the requested
      * percentage.  All load threads use the same wait time.
@@ -119,6 +120,8 @@ public class CPUhog {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
+        // dumpVersionInfo();
+
         try {
             for (int i = 0; i < args.length; i++) {
 
@@ -207,6 +210,20 @@ public class CPUhog {
 
         System.out.println();
         System.out.println("All threads started.");
+    }
+
+    /**
+     * Output version information
+     * TODO Can't find a good way to do this yet
+     */
+    private static void dumpVersionInfo() {
+        Package p = CPUhog.class.getPackage();
+        System.out.println("${application.title}" +
+                " by " +
+                "${application.vendor}" +
+                ". Version " +
+                p.getImplementationVersion());
+
     }
 
     private static void usage() {
