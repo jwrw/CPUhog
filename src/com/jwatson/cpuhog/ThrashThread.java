@@ -22,9 +22,9 @@ final public class ThrashThread extends Thread {
     @Override
     public final void run() {
         while (true) {
-            double[][] a = new double[CPUhog.mSize][CPUhog.mSize];
-            double[][] b = new double[CPUhog.mSize][CPUhog.mSize];
-            double[][] result = new double[CPUhog.mSize][CPUhog.mSize];
+            double[][] a = new double[CPUhog.loadSize][CPUhog.loadSize];
+            double[][] b = new double[CPUhog.loadSize][CPUhog.loadSize];
+            double[][] result = new double[CPUhog.loadSize][CPUhog.loadSize];
 
             do {
                 long t0 = System.nanoTime();
@@ -49,7 +49,7 @@ final public class ThrashThread extends Thread {
                         }
                     }
                 }
-            } while (a.length == CPUhog.mSize);
+            } while (a.length == CPUhog.loadSize);
         }
     }
 

@@ -82,9 +82,9 @@ class MonitorThread implements Runnable {
                             CPUhog.monitorWait_ms * 1000000. * CPUhog.targetCPUpercent / 100. /
                             aveLoadLoopTime_ns;
                     if (runTimesPerLog<CPUhog.LOADRUNSPERLOG_LO) {
-                            CPUhog.mSize--;
+                            CPUhog.loadSize--;
                     } else if (runTimesPerLog>CPUhog.LOADRUNSPERLOG_HI) {
-                             CPUhog.mSize++;
+                             CPUhog.loadSize++;
                     }
                 }
 
@@ -111,7 +111,7 @@ class MonitorThread implements Runnable {
                             perProcessorPercentCPU,
                             aveLoadLoopTime_ns / 1e9,
                             CPUhog.loadWait_ms,
-                            CPUhog.mSize));
+                            CPUhog.loadSize));
                 }
 
                 totalUserTime = newTotalUserTime;

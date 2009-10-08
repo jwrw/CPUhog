@@ -89,14 +89,43 @@ import java.util.TreeMap;
  */
 public class CPUhog {
 
+    /** Number of times to perform the main load loop */
     public final static int NLOOPS = 25;
+
+    /** Number of lines of monitor output between re-printing of the column titles */
     public final static int ITERSPERTITLE = 20;
+
+    /** Text <not supported> */
     public final static String NOT_SUPPORTED = "<not supported>";
+
+    /** Don't adjust the wait time in the load loop too quickly
+     * Only this proportion of the desired wait time is averaged with the
+     * current wait time.
+     */
     public final static double LOADWAITDAMPING = 0.3;
+
+    /** The automatic adjustment will adjust the load complexity try to allow 
+     * the load loop to run a number of times wihtin a single monitoring period.
+     * The adjustment calculations aim to make this number between _LO and _HI
+     * number of load loops in a single log period
+     */
     public final static double LOADRUNSPERLOG_LO = 1.;
+
+    /** The automatic adjustment will adjust the load complexity try to allow
+     * the load loop to run a number of times wihtin a single monitoring period.
+     * The adjustment calculations aim to make this number between _LO and _HI
+     * number of load loops in a single log period
+     */
     public final static double LOADRUNSPERLOG_HI = 5.;
+
+    /** Number of load threads the application will create */
     public static int nThreads = 10;
-    public static int mSize = 10;
+
+    /** the size of the load
+     * The bigger this value, the greater amount of time the main load part
+     * of the laod loop will take.
+     */
+    public static int loadSize = 10;
     public static long monitorWait_ms = 2000;
     public static boolean autoDimensioningAllowed = false;
     public static boolean showCompilationStats = false;
@@ -133,8 +162,8 @@ public class CPUhog {
                     }
                 } else if (args[i].equals("-d")) {
                     i++;
-                    mSize = Integer.parseInt(args[i]);
-                    if (mSize < 1) {
+                    loadSize = Integer.parseInt(args[i]);
+                    if (loadSize < 1) {
                         throw new IllegalArgumentException("must have matrix dimensions >= 1");
                     }
                 } else if (args[i].equals("-da")) {
@@ -142,7 +171,7 @@ public class CPUhog {
                 } else if (args[i].equals("-w")) {
                     i++;
                     monitorWait_ms = Long.parseLong(args[i]);
-                    if (mSize < 1) {
+                    if (loadSize < 1) {
                         throw new IllegalArgumentException("must have wait >= 0 ms");
                     }
                 } else if (args[i].equals("-sn")) {
@@ -192,7 +221,7 @@ public class CPUhog {
         dumpSystemInformation();
 
         System.out.println("Hogging all the CPU with " + nThreads + " java threads\n" +
-                "doing " + mSize + "x" + mSize + " matrix arithmetic.");
+                "doing " + loadSize + "x" + loadSize + " matrix arithmetic.");
 
         monitorThread = new Thread(new MonitorThread());
         loadThreads = new ArrayList<ThrashThread>(nThreads);
