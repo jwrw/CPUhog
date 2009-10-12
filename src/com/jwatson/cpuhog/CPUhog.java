@@ -76,8 +76,6 @@ import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Properties;
 import java.util.TreeMap;
 
 /**
