@@ -15,74 +15,86 @@ final public class ThrashThread extends Thread {
 
     /**
      * This method creates a CPU load on the system.
-     * It uses three double matrices and avoids object creation
+     * It uses two double vecors and avoids object creation
      * and destruction (and garbage collection).
      * Memory footprint should remain fairly static during execution.
+     *
+     * The coefs are scaled to ensure they average 1.0
+     * The signal vector is re-randomised periodically to stop it getting too big or small
+     *
+     * If the required loadSize is changed then new vectors are created
+     * 
      */
     @Override
     public final void run() {
         while (true) {
-            double[][] a = new double[CPUhog.loadSize][CPUhog.loadSize];
-            double[][] b = new double[CPUhog.loadSize][CPUhog.loadSize];
-            double[][] result = new double[CPUhog.loadSize][CPUhog.loadSize];
+            double[] coefs = new double[CPUhog.loadSize];
+            double[] signal = new double[CPUhog.loadSize * CPUhog.SIGNAL_FACTOR];
 
-            do {
-                long t0 = System.nanoTime();
-                for (int r = 0; r < a.length; r++) {
-                    for (int c = 0; c < a[0].length; c++) {
-                        a[r][c] = Math.random();
-                        b[r][c] = Math.random();
+            fillCoefs(coefs);
+
+sizeChanged:
+            while (true) {
+                randomiseSignal(signal);
+
+                for (int i = 0; i < 100; i++) {
+                    long t0 = System.nanoTime();
+
+                    convolve(coefs, signal);
+
+                    loopTime_ns = (System.nanoTime() - t0);
+
+                    if (coefs.length != CPUhog.loadSize) {
+                        break sizeChanged;
                     }
-                }
 
-                for (int i = 0; i < CPUhog.NLOOPS; i++) {
-                    matrixMultiply(result, a, b);
-                    matrixCopy(a, result);
-                }
-                loopTime_ns = (System.nanoTime() - t0);
-
-                if (CPUhog.loadWait_ms > 0) {
-                    synchronized (this) {
-                        try {
-                            this.wait(CPUhog.loadWait_ms);
-                        } catch (InterruptedException ex) {
+                    if (CPUhog.loadWait_ms > 0) {
+                        synchronized (this) {
+                            try {
+                                this.wait(CPUhog.loadWait_ms);
+                            } catch (InterruptedException ex) {
+                            }
                         }
                     }
                 }
-            } while (a.length == CPUhog.loadSize);
-        }
-    }
-
-    /**
-     * Compute result = matrix a x matrix b
-     * @param result
-     * @param a
-     * @param b
-     */
-    public final static void matrixMultiply(double result[][], double a[][], double b[][]) {
-        double sum;
-        for (int r = 0; r < result.length; r++) {
-            for (int c = 0; c < result[0].length; c++) {
-                sum = 0;
-                for (int rc = 0; rc < a.length; rc++) {
-                    sum += a[r][rc] * b[rc][c];
-                }
-                result[r][c] = sum;
             }
         }
     }
 
-    /**
-     * Copy maxtrix a to the result matrix
-     * @param result
-     * @param a
-     */
-    public final static void matrixCopy(double result[][], double a[][]) {
-        for (int r = 0; r < result.length; r++) {
-            for (int c = 0; c < result[0].length; c++) {
-                result[r][c] = a[r][c];
-            }
+    private void fillCoefs(double[] coefs) {
+        double sum = 0;
+        for (int i = 0; i < coefs.length; i++) {
+            sum += coefs[i] = Math.random();
         }
+        double scale = coefs.length / sum;
+        for (int i = 0; i < coefs.length; i++) {
+            coefs[i] *= scale;
+        }
+    }
+
+    private void randomiseSignal(double[] signal) {
+        for (int i = 0; i < signal.length; i++) {
+            signal[i] = Math.random();
+        }
+    }
+
+    /**
+     * This function represents the load - it is this routine that
+     * is timed to give the 'load time' or 'loop time'
+     *
+     * @param coefs
+     * @param signal
+     */
+    private void convolve(double[] coefs, double[] signal) {
+        for (int off = 0; off < signal.length - coefs.length; off++) {
+            double sum = 0;
+            for (int i = 0; i < coefs.length; i++) {
+                sum += signal[i + off] * coefs[i];
+            }
+            signal[off] = sum;
+        }
+
+
 
     }
 }

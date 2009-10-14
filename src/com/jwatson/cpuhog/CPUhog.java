@@ -16,7 +16,7 @@
  * The load uses a mixture of integer and double floating point arithmetic
  * which provides a good load on many platforms.  However some CPU architectures
  * with restricted availabilty of floating point hardware may find their integer
- * components not fully utilised.  (A future version may do something about this).
+ * components not fully utilised.  (A future version could do something about this).
  *
  * The application can also print out a great deal of diagnosic information
  * about the system, the JVM and the environment. This information is largely
@@ -33,12 +33,13 @@
  *          well as the specified number of load threads.  You may see additional
  *          threads created by the JVM for system use.
  *
- * -d nnn   The dimension of the square matrices used in the load thread (default 10).
- *          Larger values here result in a larger memory footprint.  Too large
- *          and your application will start to get out of memory errors.  When
- *          this starts happening, the CPU load cannot usually be maintained.
- * -da      Permit the application to adjust the array dimension.  Initially this
- *          will reduce the matrix dimensions when out of memory errors start to
+ * -s nnn   The number of coefficients in the vector used during the convolution.
+ *          The signal vector that the coefficients are applied against is a fixed
+ *          multiple in size of the coefficient vector.  So doubling the number
+ *          coefficients will nearly increase the load execution time by 4.
+ *
+ * -a       Permit the application to adjust the vector size automatically.
+ *          Initially this will reduce the size when out of memory errors start to
  *          occur.  During adjustment the load may fluctuate.  Currently the
  *          size is not adjusted upwards so the -d option can be used to set an
  *          upper value.
@@ -89,43 +90,44 @@ public class CPUhog {
 
     /** Number of times to perform the main load loop */
     public final static int NLOOPS = 25;
-
     /** Number of lines of monitor output between re-printing of the column titles */
     public final static int ITERSPERTITLE = 20;
-
     /** Text <not supported> */
     public final static String NOT_SUPPORTED = "<not supported>";
-
     /** Don't adjust the wait time in the load loop too quickly
      * Only this proportion of the desired wait time is averaged with the
      * current wait time.
      */
     public final static double LOADWAITDAMPING = 0.3;
-
     /** The automatic adjustment will adjust the load complexity try to allow 
      * the load loop to run a number of times wihtin a single monitoring period.
      * The adjustment calculations aim to make this number between _LO and _HI
      * number of load loops in a single log period
      */
-    public final static double LOADRUNSPERLOG_LO = 1.;
-
+    public final static double LOADRUNSPERLOG_LO = 1.7;
     /** The automatic adjustment will adjust the load complexity try to allow
      * the load loop to run a number of times wihtin a single monitoring period.
      * The adjustment calculations aim to make this number between _LO and _HI
      * number of load loops in a single log period
      */
-    public final static double LOADRUNSPERLOG_HI = 5.;
-
+    public final static double LOADRUNSPERLOG_HI = 3.;
+    /** The automatic adjustment will adjust the load complexity try to allow
+     * the load loop to run a this number of times wihtin a single monitoring period.
+     */
+    public final static double LOADRUNSPERLOG_TARGET = 2.;
+    /** The signal vector is a number of times larger than the coefficient vector
+     *  This factor determines how much bigger
+     */
+    public final static int SIGNAL_FACTOR = 100;
     /** Number of load threads the application will create */
     public static int nThreads = 10;
-
     /** the size of the load
      * The bigger this value, the greater amount of time the main load part
-     * of the laod loop will take.
+     * of the load loop will take.
      */
-    public static int loadSize = 10;
+    volatile public static int loadSize = 100;
     public static long monitorWait_ms = 2000;
-    public static boolean autoDimensioningAllowed = false;
+    public static boolean autoSizeAdjustmentAllowed = false;
     public static boolean showCompilationStats = false;
     public static boolean showOSStats = true;
     public static boolean showRuntimeStats = false;
@@ -158,14 +160,14 @@ public class CPUhog {
                     if (nThreads < 1) {
                         throw new IllegalArgumentException("must have number of threads >= 1");
                     }
-                } else if (args[i].equals("-d")) {
+                } else if (args[i].equals("-s")) {
                     i++;
                     loadSize = Integer.parseInt(args[i]);
                     if (loadSize < 1) {
-                        throw new IllegalArgumentException("must have matrix dimensions >= 1");
+                        throw new IllegalArgumentException("must have coefficients vector size >= 1");
                     }
-                } else if (args[i].equals("-da")) {
-                    autoDimensioningAllowed = true;
+                } else if (args[i].equals("-a")) {
+                    autoSizeAdjustmentAllowed = true;
                 } else if (args[i].equals("-w")) {
                     i++;
                     monitorWait_ms = Long.parseLong(args[i]);
@@ -218,8 +220,15 @@ public class CPUhog {
 
         dumpSystemInformation();
 
-        System.out.println("Hogging all the CPU with " + nThreads + " java threads\n" +
-                "doing " + loadSize + "x" + loadSize + " matrix arithmetic.");
+        System.out.println("Hogging the CPU with " + nThreads + " java threads " +
+                "doing " + loadSize + " element convolution.");
+        System.out.print("Monitoring displayed every " + monitorWait_ms +
+                "ms with target CPU usage of " + targetCPUpercent + "%");
+        if (autoSizeAdjustmentAllowed) {
+            System.out.println(" and automtic load size adjustment");
+        } else {
+            System.out.println(". Load size is constant.");
+        }
 
         monitorThread = new Thread(new MonitorThread());
         loadThreads = new ArrayList<ThrashThread>(nThreads);
@@ -231,7 +240,8 @@ public class CPUhog {
             ThrashThread t = new ThrashThread();
             loadThreads.add(t);
             t.setPriority(t.getPriority() - 1);   // minimise system killing ability?
-            t.setDaemon(true);                  // faster exit?
+            t.setDaemon(false);                  // slower exit
+                                                 // but everything is forced killed
             t.start();
         }
 
@@ -265,13 +275,12 @@ public class CPUhog {
                 "          well as the specified number of load threads.  You may see additional\n" +
                 "          threads created by the JVM for system use.\n" +
                 "\n" +
-                " -d nnn   The dimension of the square matrices used in the load thread (default 10).\n" +
-                "          Larger values here result in a larger memory footprint.  Too large\n" +
-                "          and your application will start to get out of memory errors.  When\n" +
-                "          this starts happening, the CPU load cannot usually be maintained.\n" +
+                " -s nnn   The size of the vector used during the convolution (default 100).\n" +
+                "          Note that doubling the number coefficients will \n" +
+                "          appoximately increase the load execution time by 4.\n" +
                 "\n" +
-                " -da      Permit the application to adjust the array dimension.  Initially this\n" +
-                "          will reduce the matrix dimensions when out of memory errors start to\n" +
+                " -a       Permit the application to adjust the vector size automatically.\n" +
+                "          Initially this will reduce the size when out of memory errors start to\n" +
                 "          occur.  During adjustment the load may fluctuate.  Currently the\n" +
                 "          size is not adjusted upwards so the -d option can be used to set an\n" +
                 "          upper value.\n" +
@@ -290,7 +299,7 @@ public class CPUhog {
                 " -c nnn   The target percentage of total CPU to use (integer - default 100).\n" +
                 "          A delay within each load thread will be adjusted to bring the aggregate\n" +
                 "          load on the system to the specified percentage. The granularity that\n" +
-                "          the application can achieve will be determined by the size of matrix\n" +
+                "          the application can achieve will be determined by the size of load\n" +
                 "          and the speed of CPU.  This also relies on the JVM / OS to spread the\n" +
                 "          total load evenly (although this may be what you are testing!)\n" +
                 "\n" +
