@@ -7,15 +7,20 @@ package com.jwatson.cpuhog;
  */
 final public class ThrashThread extends Thread {
 
-    private volatile long loopTime_ns = -1;
+    private volatile long loadExecuteTime_ns = -1;
+    private volatile long actualWaitTime_ns = -1;
 
-    public long getLoopTime_ns() {
-        return loopTime_ns;
+    public long getLoadExecuteTime_ns() {
+        return loadExecuteTime_ns;
+    }
+
+    public long getActualWaitTime_ns() {
+        return actualWaitTime_ns;
     }
 
     /**
      * This method creates a CPU load on the system.
-     * It uses two double vecors and avoids object creation
+     * It uses two double vectors and avoids object creation
      * and destruction (and garbage collection).
      * Memory footprint should remain fairly static during execution.
      *
@@ -23,6 +28,9 @@ final public class ThrashThread extends Thread {
      * The signal vector is re-randomised periodically to stop it getting too big or small
      *
      * If the required loadSize is changed then new vectors are created
+     * 
+     * Note that the total time (s) for each iteration is
+     * Total loop time is loadExecute_ns/1e9 + loadWaitTime_ms/1e3
      * 
      */
     @Override
@@ -33,29 +41,33 @@ final public class ThrashThread extends Thread {
 
             fillCoefs(coefs);
 
-sizeChanged:
+            sizeChanged:
             while (true) {
                 randomiseSignal(signal);
 
                 for (int i = 0; i < 100; i++) {
-                    long t0 = System.nanoTime();
-
-                    convolve(coefs, signal);
-
-                    loopTime_ns = (System.nanoTime() - t0);
 
                     if (coefs.length != CPUhog.loadSize) {
                         break sizeChanged;
                     }
 
-                    if (CPUhog.loadWait_ms > 0) {
+                    long t0 = System.nanoTime();
+
+                    convolve(coefs, signal);
+
+                    loadExecuteTime_ns = (System.nanoTime() - t0);
+
+
+                    long t1 = System.nanoTime();
+                    if (CPUhog.loadWaitTime_ms > 0) {
                         synchronized (this) {
                             try {
-                                this.wait(CPUhog.loadWait_ms);
+                                this.wait(CPUhog.loadWaitTime_ms);
                             } catch (InterruptedException ex) {
                             }
                         }
                     }
+                    actualWaitTime_ns = (System.nanoTime() - t1);
                 }
             }
         }
@@ -93,8 +105,5 @@ sizeChanged:
             }
             signal[off] = sum;
         }
-
-
-
     }
 }

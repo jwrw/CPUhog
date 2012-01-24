@@ -23,7 +23,7 @@ class MonitorThread implements Runnable {
         long sysTime = 0;
         while (true) {
             if (CPUhog.generateLogging) {
-                System.out.println("Time /s Threads CPUs   Free KBs  Total KBs    Max KBs  %CPU User %CPU Total %CPU / CPU LoopTme/ms Ld Wait/ms vSize");
+                System.out.println("Time /s Threads CPUs   Free KBs  Total KBs    Max KBs  %CPU User %CPU Total %CPU / CPU ExeTime/ms Ld Wait/ms vSize");
             }
             for (int i = 0; i < CPUhog.ITERSPERTITLE; i++) {
                 // Get the threads in the current thread group into an array
@@ -52,16 +52,16 @@ class MonitorThread implements Runnable {
                 // interrogate only the load threads to
                 // get an average time to perform the load within
                 // the main thread loop
-                long sumLoopTime = 0;
+                long sumExecuteTime = 0;
                 int nLoadThreads = 0;
                 for (ThrashThread t : CPUhog.loadThreads) {
-                    if (t.getLoopTime_ns() > 0) {
-                        sumLoopTime += t.getLoopTime_ns();
+                    if (t.getLoadExecuteTime_ns() > 0) {
+                        sumExecuteTime += t.getLoadExecuteTime_ns();
                         nLoadThreads++;
                     }
                 }
                 if (nLoadThreads == 0) {
-                    sumLoopTime = -1;
+                    sumExecuteTime = -1;
                     nLoadThreads = 1;
                 }
                 // Vector size may be adjusted if the load is running too
@@ -76,14 +76,14 @@ class MonitorThread implements Runnable {
                 double percentUserTime = 100. * (newTotalUserTime - totalUserTime) / timeDelta_ns;
                 double percentCPUTime = 100. * (newTotalCPUTime - totalCPUTime) / timeDelta_ns;
                 double perProcessorPercentCPU = percentCPUTime / rt.availableProcessors();
-                double aveLoadLoopTime_ns = sumLoopTime / nLoadThreads;
+                double aveLoadExecuteTime_ns = sumExecuteTime / nLoadThreads;
 
-                if (CPUhog.autoSizeAdjustmentAllowed && sumLoopTime > 0) {
+                if (CPUhog.autoSizeAdjustmentAllowed && sumExecuteTime > 0) {
                     // for this loop time work out how many times this theoretically ought
                     // to run if the loop wait time were perfect
                     double runTimesPerLog =
                             (CPUhog.monitorWait_ms / 1000.) * (CPUhog.targetCPUpercent / 100.) /
-                            (aveLoadLoopTime_ns / 1.e9);
+                            (aveLoadExecuteTime_ns / 1.e9);
                     // Now adjust - about halfway to the correct value if outside the
                     // HI/LO tolerance - otherwise just tweak a bit
                     if (runTimesPerLog < CPUhog.LOADRUNSPERLOG_LO) {
@@ -98,10 +98,15 @@ class MonitorThread implements Runnable {
                 // Adjust the wait time used in the load threads to give
                 // the target CPU load
                 if (CPUhog.targetCPUpercent < 100) {
-                    double newLoadWaitTime_ns = aveLoadLoopTime_ns * (100. - CPUhog.targetCPUpercent) / CPUhog.targetCPUpercent;
-                    CPUhog.loadWait_ms =
-                            (int) (CPUhog.loadWait_ms * (1.0 - CPUhog.LOADWAITDAMPING) +
-                            (newLoadWaitTime_ns / 1.0e6) * CPUhog.LOADWAITDAMPING);
+                    double theoreticLoadWaitTime_ns = aveLoadExecuteTime_ns * (100. - CPUhog.targetCPUpercent) / CPUhog.targetCPUpercent;
+                    double correctedLoadWaitTime_ns = 
+                            (aveLoadExecuteTime_ns+CPUhog.loadWaitTime_ms*1.0e6) * perProcessorPercentCPU / CPUhog.targetCPUpercent - aveLoadExecuteTime_ns;
+ //                   CPUhog.loadWaitTime_ms =
+ //                           (int) (CPUhog.loadWaitTime_ms * (1.0 - CPUhog.LOADWAITDAMPING) +
+ //                           (theoreticalLoadWaitTime_ns / 1.0e6) * CPUhog.LOADWAITDAMPING);
+                   CPUhog.loadWaitTime_ms =
+                            (int) (CPUhog.loadWaitTime_ms * (1.0 - CPUhog.LOADWAITDAMPING) +
+                            (correctedLoadWaitTime_ns / 1.0e6) * CPUhog.LOADWAITDAMPING);
                 }
 
                 if (CPUhog.generateLogging) {
@@ -115,8 +120,8 @@ class MonitorThread implements Runnable {
                             percentUserTime,
                             percentCPUTime,
                             perProcessorPercentCPU,
-                            aveLoadLoopTime_ns / 1e6,
-                            CPUhog.loadWait_ms,
+                            aveLoadExecuteTime_ns / 1e6,
+                            CPUhog.loadWaitTime_ms,
                             CPUhog.loadSize));
                 }
 
@@ -137,7 +142,7 @@ class MonitorThread implements Runnable {
     }
 
     /**
-     * Return a new load sizing based on a theoretic esimate of load
+     * Return a new load sizing based on a theoretic estimate of load
      * required to achieve target loop time.
      * The estimate is allowed to be as small as necessary - however
      * the upper bound is limited to twice the current value.

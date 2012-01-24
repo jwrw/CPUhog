@@ -96,23 +96,23 @@ public class CPUhog {
     public final static String NOT_SUPPORTED = "<not supported>";
     /** Don't adjust the wait time in the load loop too quickly
      * Only this proportion of the desired wait time is averaged with the
-     * current wait time.
+     * current wait time. i.e. 1 => no damping; 0 => so damped there is no change
      */
     public final static double LOADWAITDAMPING = 0.3;
     /** The automatic adjustment will adjust the load complexity try to allow 
-     * the load loop to run a number of times wihtin a single monitoring period.
+     * the load loop to run a number of times within a single monitoring period.
      * The adjustment calculations aim to make this number between _LO and _HI
      * number of load loops in a single log period
      */
     public final static double LOADRUNSPERLOG_LO = 1.7;
     /** The automatic adjustment will adjust the load complexity try to allow
-     * the load loop to run a number of times wihtin a single monitoring period.
+     * the load loop to run a number of times within a single monitoring period.
      * The adjustment calculations aim to make this number between _LO and _HI
      * number of load loops in a single log period
      */
     public final static double LOADRUNSPERLOG_HI = 3.;
     /** The automatic adjustment will adjust the load complexity try to allow
-     * the load loop to run a this number of times wihtin a single monitoring period.
+     * the load loop to run a this number of times within a single monitoring period.
      */
     public final static double LOADRUNSPERLOG_TARGET = 2.;
     /** The signal vector is a number of times larger than the coefficient vector
@@ -125,7 +125,7 @@ public class CPUhog {
      * The bigger this value, the greater amount of time the main load part
      * of the load loop will take.
      */
-    volatile public static int loadSize = 100;
+    volatile public static int loadSize = 1000;
     public static long monitorWait_ms = 2000;
     public static boolean autoSizeAdjustmentAllowed = false;
     public static boolean showCompilationStats = false;
@@ -141,8 +141,9 @@ public class CPUhog {
     /** The wait time in the load loop cannot be set by the user but
      * is adjusted by the application to fix the load at the requested
      * percentage.  All load threads use the same wait time.
+     * Total loop time is loadExecute_ns/1e9 + loadWaitTime_ms/1e3
      */
-    public static int loadWait_ms = 0;
+    public static int loadWaitTime_ms = 0;
 
     /**
      * Main entry point for the application
