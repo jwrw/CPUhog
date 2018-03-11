@@ -92,11 +92,11 @@ public class CPUhog {
     public final static int NLOOPS = 25;
     /** Number of lines of monitor output between re-printing of the column titles */
     public final static int ITERSPERTITLE = 20;
-    /** Text <not supported> */
+    /** Text for "not supported" */
     public final static String NOT_SUPPORTED = "<not supported>";
     /** Don't adjust the wait time in the load loop too quickly
      * Only this proportion of the desired wait time is averaged with the
-     * current wait time. i.e. 1 => no damping; 0 => so damped there is no change
+     * current wait time. i.e. 1 = no damping; 0 = so damped there is no change
      */
     public final static double LOADWAITDAMPING = 0.3;
     /** The automatic adjustment will adjust the load complexity try to allow 
