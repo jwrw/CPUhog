@@ -27,7 +27,8 @@ Hog the CPU
  java -jar CPUhog <options>
  
  The options can be specified in any order and later ones override earlier ones.
- Available options are
+ Available options are:
+ 
  -t nnn   Start load nnn threads (default 10).  Typically the main program
           runs in the initial thread and it starts a monitoring thread as
           well as the specified number of load threads.  You may see additional
