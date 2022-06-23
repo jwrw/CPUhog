@@ -1,5 +1,5 @@
 # CPUhog
-Hog the CPU
+*Hog the CPU*
 
  The CPUhog provides a simple way to load a multiprocessor / multithread machine
  to the specified degree.
@@ -24,43 +24,26 @@ Hog the CPU
  comprehensive description of the statistics generated may be found there.
  
  Usage:
+ ```
  java -jar CPUhog <options>
- 
+ ```
  The options can be specified in any order and later ones override earlier ones.
  Available options are:
- 
- -t nnn   Start load nnn threads (default 10).  Typically the main program
-          runs in the initial thread and it starts a monitoring thread as
-          well as the specified number of load threads.  You may see additional
-          threads created by the JVM for system use.
- 
- -s nnn   The number of coefficients in the vector used during the convolution.
-          The signal vector that the coefficients are applied against is a fixed
-          multiple in size of the coefficient vector.  So doubling the number
-          coefficients will nearly increase the load execution time by 4.
- 
- -a       Permit the application to adjust the vector size automatically.
-          Initially this will reduce the size when out of memory errors start to
-          occur.  During adjustment the load may fluctuate.  Currently the
-          size is not adjusted upwards so the -d option can be used to set an
-          upper value.
- 
- -w nnn   The amount of time (ms) to wait between log line outputs.
- 
- -sn      No statistics.
- -sa      All statistics
- -sc      Compilation information
- -so      Operating system information.  This is the only section output by default.
- -sr      Runtime information (includes all java system properties)
- -st      Thread information
- -sm      Memory information
- -sp      Memory pool information
- 
- -c nnn   The target percentage of total CPU to use (integer - default 100).
-          A delay within each load thread will be adjusted to bring the aggregate
-          load on the system to the specified percentage. The granularity that
-          the application can achieve will be determined by the size of matrix
-          and the speed of CPU.  This also relies on the JVM / OS to spread the
-          total load evenly (although this may be what you are testing!)
- 
- -q       Suppress logging information.
+
+|Option|Description| 
+|-|-|
+|`-t nnn`|Start load in `nnn` threads (default 10). Typically the main program runs in the initial thread and it starts a monitoring thread as well as the specified number of load threads.  You may see additional threads created by the JVM for system use. |
+|`-s nnn`|The number of coefficients in the vector used during the convolution. The signal vector that the coefficients are applied against is a fixed multiple in size of the coefficient vector.  So doubling the number coefficients will nearly increase the load execution time by 4.
+|`-a`|Permit the application to adjust the vector size automatically. Initially this will reduce the size when out of memory errors start to occur.  During adjustment the load may fluctuate.  Currently the size is not adjusted upwards so the -d option can be used to set an upper value.
+|`-w nnn`|The amount of time (ms) to wait between log line outputs.|
+|`-sn` |  No statistics.|
+|`-sa` |  All statistics|
+|`-sc` |  Compilation information|
+|`-so` |  Operating system information.  This is the only |section output by default.
+ |`-sr` |  Runtime information (includes all java system |properties)
+|`-st` |  Thread information|
+|`-sm` |  Memory information|
+|`-sp` |  Memory pool information|
+|`-c nnn`|The target percentage of total CPU to use (integer - default 100). A delay within each load thread will be adjusted to bring the aggregate load on the system to the specified percentage. The granularity that the application can achieve will be determined by the size of matrix and the speed of CPU.  This also relies on the JVM / OS to spread the total load evenly (although this may be what you are testing!) |
+|`-q` |  Quiet - Suppress logging information.|
+| | |

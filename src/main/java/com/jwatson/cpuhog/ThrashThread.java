@@ -2,10 +2,13 @@ package com.jwatson.cpuhog;
 
 /**
  * All the things the application does to load the system are in this class.
- * 
+ *
  * @author WatsonJ
  */
-final public class ThrashThread extends Thread {
+@SuppressWarnings("checkstyle:membername")
+public final class ThrashThread extends Thread {
+
+    private static final int A_FEW_TIMES = 100;
 
     private volatile long loadExecuteTime_ns = -1;
     private volatile long actualWaitTime_ns = -1;
@@ -19,35 +22,33 @@ final public class ThrashThread extends Thread {
     }
 
     /**
-     * This method creates a CPU load on the system.
-     * It uses two double vectors and avoids object creation
-     * and destruction (and garbage collection).
-     * Memory footprint should remain fairly static during execution.
+     * This method creates a CPU load on the system. It uses two double vectors and avoids object
+     * creation and destruction (and garbage collection). Memory footprint should remain fairly
+     * static during execution.
      *
-     * The coefs are scaled to ensure they average 1.0
-     * The signal vector is re-randomised periodically to stop it getting too big or small
+     * The coefs are scaled to ensure they average 1.0 The signal vector is re-randomised
+     * periodically to stop it getting too big or small
      *
      * If the required loadSize is changed then new vectors are created
-     * 
-     * Note that the total time (s) for each iteration is
-     * Total loop time is loadExecute_ns/1e9 + loadWaitTime_ms/1e3
-     * 
+     *
+     * Note that the total time (s) for each iteration is Total loop time is loadExecute_ns/1e9 +
+     * loadWaitTime_ms/1e3
+     *
      */
     @Override
-    public final void run() {
+    public void run() {
         while (true) {
-            double[] coefs = new double[CPUhog.loadSize];
-            double[] signal = new double[CPUhog.loadSize * CPUhog.SIGNAL_FACTOR];
+            double[] coefs = new double[CPUhog.getLoadSize()];
+            double[] signal = new double[CPUhog.getLoadSize() * CPUhog.SIGNAL_FACTOR];
 
             fillCoefs(coefs);
 
-            sizeChanged:
-            while (true) {
+            sizeChanged: while (true) {
                 randomiseSignal(signal);
 
-                for (int i = 0; i < 100; i++) {
+                for (int i = 0; i < A_FEW_TIMES; i++) {
 
-                    if (coefs.length != CPUhog.loadSize) {
+                    if (coefs.length != CPUhog.getLoadSize()) {
                         break sizeChanged;
                     }
 
@@ -55,19 +56,19 @@ final public class ThrashThread extends Thread {
 
                     convolve(coefs, signal);
 
-                    loadExecuteTime_ns = (System.nanoTime() - t0);
+                    loadExecuteTime_ns = System.nanoTime() - t0;
 
 
                     long t1 = System.nanoTime();
-                    if (CPUhog.loadWaitTime_ms > 0) {
+                    if (CPUhog.getLoadWaitTime_ms() > 0) {
                         synchronized (this) {
                             try {
-                                this.wait(CPUhog.loadWaitTime_ms);
+                                this.wait(CPUhog.getLoadWaitTime_ms());
                             } catch (InterruptedException ex) {
                             }
                         }
                     }
-                    actualWaitTime_ns = (System.nanoTime() - t1);
+                    actualWaitTime_ns = System.nanoTime() - t1;
                 }
             }
         }
@@ -76,7 +77,8 @@ final public class ThrashThread extends Thread {
     private void fillCoefs(double[] coefs) {
         double sum = 0;
         for (int i = 0; i < coefs.length; i++) {
-            sum += coefs[i] = Math.random();
+            coefs[i] = Math.random();
+            sum += coefs[i];
         }
         double scale = coefs.length / sum;
         for (int i = 0; i < coefs.length; i++) {
@@ -91,8 +93,8 @@ final public class ThrashThread extends Thread {
     }
 
     /**
-     * This function represents the load - it is this routine that
-     * is timed to give the 'load time' or 'loop time'
+     * This function represents the load - it is this routine that is timed to give the 'load time'
+     * or 'loop time'.
      *
      * @param coefs
      * @param signal
