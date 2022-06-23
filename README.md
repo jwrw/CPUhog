@@ -40,7 +40,7 @@
 |`-sa` |  All statistics|
 |`-sc` |  Compilation information|
 |`-so` |  Operating system information.  This is the only section output by default.|
- |`-sr` |  Runtime information (includes all java system |properties)
+ |`-sr` |  Runtime information (includes all java system properties)|
 |`-st` |  Thread information|
 |`-sm` |  Memory information|
 |`-sp` |  Memory pool information|
